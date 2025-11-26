@@ -274,6 +274,30 @@ const generateBacteriumVoxels = () => {
   return { wall, membrane, cytoplasm, nucleoid, ribosomes, plasmids };
 };
 
+// 7. Background Extracellular Matrix Generation
+const generateMatrixVoxels = () => {
+  const voxels = [];
+  const range = 250;
+  const count = 1200; // Scattered macromolecules
+  
+  for (let i = 0; i < count; i++) {
+      const x = (Math.random() - 0.5) * range * 2;
+      const y = (Math.random() - 0.5) * range * 2;
+      const z = (Math.random() - 0.5) * range * 2;
+      
+      // Ensure it's not inside the main bacterium/phage area (radius approx 80-90)
+      if (x*x + y*y + z*z > 8100) {
+          voxels.push({x: Math.floor(x), y: Math.floor(y), z: Math.floor(z)});
+          
+          // Occasionally add a small cluster (protein complex)
+          if (Math.random() > 0.85) {
+               voxels.push({x: Math.floor(x)+1, y: Math.floor(y), z: Math.floor(z)});
+               voxels.push({x: Math.floor(x), y: Math.floor(y)+1, z: Math.floor(z)});
+          }
+      }
+  }
+  return voxels;
+};
 
 // --- INITIALIZATION ---
 function init() {
@@ -346,6 +370,7 @@ function init() {
     const ribosomeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x222222, emissiveIntensity: 0.1 });
     const plasmidMaterial = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xff4400, emissiveIntensity: 0.8, metalness: 0.5 });
     const flagellaMaterial = new THREE.MeshStandardMaterial({ color: 0xddeecc, roughness: 0.6, metalness: 0.1 });
+    const matrixMaterial = new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 1.0 });
 
     // --- DATA ---
     const dynamicData = {
@@ -355,6 +380,7 @@ function init() {
         injectedDNA: generateInjectedDNAVoxels(),
         bacterium: generateBacteriumVoxels(),
         flagella: generateFlagellaVoxels(),
+        matrix: generateMatrixVoxels(),
     };
 
     // --- MESH SETUP ---
@@ -419,6 +445,9 @@ function init() {
     
     // Flagella - Dynamic
     const flagellaMesh = setupMesh(dynamicData.flagella, flagellaMaterial, bacteriumGroup, true);
+    
+    // Background Matrix - Static in scene
+    setupMesh(dynamicData.matrix, matrixMaterial, scene, false);
 
     // --- ANIMATION LOOP ---
     // Phase 1 (0-12s): Injection
