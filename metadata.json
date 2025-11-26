@@ -1,0 +1,5 @@
+{
+  "name": "T4 Voxel Phage",
+  "description": "A hyper-realistic, museum-quality voxel simulation of a T4 Bacteriophage using Three.js InstancedMesh for high-performance rendering.",
+  "requestFramePermissions": []
+}
