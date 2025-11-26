@@ -306,8 +306,8 @@ function init() {
 
     // --- SCENE SETUP ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#1a1a1a'); 
-    scene.fog = new THREE.FogExp2('#1a1a1a', 0.005); 
+    scene.background = new THREE.Color('#101015'); // Deep dark blue-black void
+    scene.fog = new THREE.FogExp2('#101015', 0.005); 
 
     const aspect = window.innerWidth / window.innerHeight;
     const d = 100;
@@ -321,7 +321,7 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.3; // Increased exposure for brightness
     container.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -334,9 +334,12 @@ function init() {
     controls.target.set(0, -20, 0);
 
     // --- LIGHTING ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    // Hemisphere light adds a nice gradient from sky to ground colors, removing the "dreary" flat look
+    const hemiLight = new THREE.HemisphereLight(0xddeeff, 0x222222, 0.9);
+    scene.add(hemiLight);
+
+    // Strong Key Light (Sunlight)
+    const keyLight = new THREE.DirectionalLight(0xffffff, 3.0);
     keyLight.position.set(50, 80, 50);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 4096;
@@ -348,11 +351,16 @@ function init() {
     keyLight.shadow.camera.right = shadowSize;
     keyLight.shadow.camera.top = shadowSize;
     keyLight.shadow.camera.bottom = -shadowSize;
+    keyLight.shadow.bias = -0.0005; 
     scene.add(keyLight);
-    const fillLight = new THREE.DirectionalLight(0xddeeff, 0.8);
+
+    // Fill Light to soften shadows
+    const fillLight = new THREE.DirectionalLight(0xddeeff, 1.5);
     fillLight.position.set(-50, 40, 20);
     scene.add(fillLight);
-    const rimLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+
+    // Strong Rim Light to make the object pop against the background
+    const rimLight = new THREE.DirectionalLight(0xffeedd, 2.5);
     rimLight.position.set(0, 20, -60);
     scene.add(rimLight);
 
