@@ -280,7 +280,7 @@ const VoxelPhage: React.FC = () => {
     scene.fog = new THREE.FogExp2('#1a1a1a', 0.005); 
 
     const aspect = window.innerWidth / window.innerHeight;
-    const d = 75;
+    const d = 100; // Suspect #3 Fix: Increased from 75 to 100 to ensure full vertical coverage
     const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
     camera.position.set(100, 100, 100); 
     camera.lookAt(0, -20, 0);
@@ -566,7 +566,8 @@ const VoxelPhage: React.FC = () => {
       }
 
     };
-    requestAnimationFrame(animate);
+    // Suspect #1 Fix: Explicit call to start the loop
+    animate(performance.now());
 
     const handleResize = () => {
       const aspect = window.innerWidth / window.innerHeight;
@@ -578,6 +579,9 @@ const VoxelPhage: React.FC = () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
     window.addEventListener('resize', handleResize);
+    
+    // Suspect #2 Fix: Ensure initial size is set correctly after append
+    handleResize();
 
     return () => {
       cancelAnimationFrame(frameId);
