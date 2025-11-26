@@ -533,6 +533,13 @@ function init() {
 
     function animate(now) {
       requestAnimationFrame(animate);
+
+      // CRITICAL FIX: Reset dummy rotation at the start of each frame.
+      // During Phase 3 (Assembly), we apply rotations to 'dummy' for the assembly pieces.
+      // If this is not reset, the rotation persists into the next frame and is applied to
+      // the first meshes updated (Flagella, Sheath, etc.), causing them to spin/distort.
+      dummy.rotation.set(0, 0, 0);
+
       controls.update();
       renderer.render(scene, camera);
 
