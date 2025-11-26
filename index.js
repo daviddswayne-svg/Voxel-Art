@@ -183,7 +183,52 @@ const generateInjectedDNAVoxels = () => {
   return voxels.sort((a, b) => b.y - a.y);
 };
 
-// 5. Bacterium Generation
+// 5. Flagella Generation (Enhanced for Animation)
+const generateFlagellaVoxels = () => {
+  const voxels = [];
+  // Define starting points on the periphery of the bacterial surface
+  const origins = [
+      {x: -40, z: -30}, 
+      // Removed {x: 35, z: 40} to avoid floating flagella in cut-out zone
+      {x: -35, z: 35}, 
+      {x: 42, z: -20},
+      {x: -20, z: -45}, 
+      {x: 25, z: -40}
+  ];
+
+  origins.forEach((org, index) => {
+      // Start slightly below surface to look anchored
+      const startY = -48 - ((org.x*org.x + org.z*org.z)/150); 
+      const length = 80; // Long whip-like structure
+      
+      for(let t = 0; t < length; t += 0.5) {
+          const y = startY + t;
+          // Helical shape logic
+          const freq = 0.15;
+          const amp = 3.5;
+          const twist = y * freq + index * 2.5;
+          
+          // Lean outwards from the center to frame the scene
+          const leanX = org.x + (org.x/Math.abs(org.x || 1)) * t * 0.3;
+          const leanZ = org.z + (org.z/Math.abs(org.z || 1)) * t * 0.3;
+          
+          const x = leanX + Math.sin(twist) * amp;
+          const z = leanZ + Math.cos(twist) * amp;
+          
+          // Store extended data for animation reconstruction
+          voxels.push({
+              x, y, z, 
+              t, 
+              index,
+              leanX, 
+              leanZ
+          });
+      }
+  });
+  return voxels;
+};
+
+// 6. Bacterium Generation
 const generateBacteriumVoxels = () => {
   const wall = [];
   const membrane = [];
@@ -300,6 +345,7 @@ function init() {
     // Ribosomes initialized to White
     const ribosomeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x222222, emissiveIntensity: 0.1 });
     const plasmidMaterial = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xff4400, emissiveIntensity: 0.8, metalness: 0.5 });
+    const flagellaMaterial = new THREE.MeshStandardMaterial({ color: 0xddeecc, roughness: 0.6, metalness: 0.1 });
 
     // --- DATA ---
     const dynamicData = {
@@ -308,12 +354,19 @@ function init() {
         tail: generateTailVoxels(),
         injectedDNA: generateInjectedDNAVoxels(),
         bacterium: generateBacteriumVoxels(),
+        flagella: generateFlagellaVoxels(),
     };
 
     // --- MESH SETUP ---
     const dummy = new THREE.Object3D();
+    
+    // Group hierarchy for Brownian Motion
+    const bacteriumGroup = new THREE.Group();
+    scene.add(bacteriumGroup);
+
     const phageGroup = new THREE.Group();
-    scene.add(phageGroup);
+    bacteriumGroup.add(phageGroup);
+    
     const whiteColor = new THREE.Color(0xffffff);
 
     const setupMesh = (data, mat, parent, shadow = true, enableColors = false) => {
@@ -350,18 +403,22 @@ function init() {
     const sheathMesh = setupMesh(dynamicData.tail.sheath, metalMaterial, phageGroup);
     const headDnaMesh = setupMesh(dynamicData.headDNA, dnaMaterial, phageGroup);
     const legsMesh = setupMesh(dynamicData.tail.legs, metalMaterial, phageGroup);
-    const injectedDnaMesh = setupMesh(dynamicData.injectedDNA, dnaMaterial, scene);
-
-    setupMesh(dynamicData.bacterium.wall, cellWallMaterial, scene);
-    setupMesh(dynamicData.bacterium.membrane, membraneMaterial, scene);
-    const cytoMesh = setupMesh(dynamicData.bacterium.cytoplasm, cytoplasmMaterial, scene, false);
+    
+    // Bacterium parts added to the bacteriumGroup
+    const injectedDnaMesh = setupMesh(dynamicData.injectedDNA, dnaMaterial, bacteriumGroup);
+    setupMesh(dynamicData.bacterium.wall, cellWallMaterial, bacteriumGroup);
+    setupMesh(dynamicData.bacterium.membrane, membraneMaterial, bacteriumGroup);
+    const cytoMesh = setupMesh(dynamicData.bacterium.cytoplasm, cytoplasmMaterial, bacteriumGroup, false);
     cytoMesh.castShadow = false;
     
     // Phase 2 Interactive Meshes
-    const nucleoidMesh = setupMesh(dynamicData.bacterium.nucleoid, nucleoidMaterial, scene);
+    const nucleoidMesh = setupMesh(dynamicData.bacterium.nucleoid, nucleoidMaterial, bacteriumGroup);
     // Enable color for ribosomes to allow hijacking change
-    const ribosomeMesh = setupMesh(dynamicData.bacterium.ribosomes, ribosomeMaterial, scene, true, true);
-    setupMesh(dynamicData.bacterium.plasmids, plasmidMaterial, scene);
+    const ribosomeMesh = setupMesh(dynamicData.bacterium.ribosomes, ribosomeMaterial, bacteriumGroup, true, true);
+    setupMesh(dynamicData.bacterium.plasmids, plasmidMaterial, bacteriumGroup);
+    
+    // Flagella - Dynamic
+    const flagellaMesh = setupMesh(dynamicData.flagella, flagellaMaterial, bacteriumGroup, true);
 
     // --- ANIMATION LOOP ---
     // Phase 1 (0-12s): Injection
@@ -380,6 +437,40 @@ function init() {
 
       const elapsed = (now - startTime) % totalDuration;
       
+      // --- BIOLOGICAL MOVEMENT (Brownian + Undulation) ---
+      // 1. Whole body slight floating/breathing
+      bacteriumGroup.rotation.z = Math.sin(now * 0.0005) * 0.05;
+      bacteriumGroup.rotation.x = Math.sin(now * 0.0003) * 0.05;
+      bacteriumGroup.position.y = Math.sin(now * 0.0008) * 2.0;
+      
+      const breath = 1 + Math.sin(now * 0.001) * 0.005;
+      bacteriumGroup.scale.set(breath, breath, breath);
+
+      // 2. Flagella Undulation
+      if (flagellaMesh) {
+         const fData = dynamicData.flagella;
+         for(let i=0; i<fData.length; i++) {
+             const v = fData[i];
+             // Re-run helical logic with time offset
+             const time = now * 0.003;
+             const twist = v.t * 0.15 + v.index * 2.5 - time; // Move wave down
+             
+             // Ramp up amplitude from 0 at base (t=0) to max at tip
+             // This keeps attachment point effectively static relative to the wall
+             const attachmentEase = Math.min(1.0, v.t / 10.0);
+             const amp = 3.5 * attachmentEase; 
+             
+             const nx = v.leanX + Math.sin(twist) * amp;
+             const nz = v.leanZ + Math.cos(twist) * amp;
+             
+             dummy.position.set(nx, v.y, nz);
+             dummy.scale.set(1, 1, 1);
+             dummy.updateMatrix();
+             flagellaMesh.setMatrixAt(i, dummy.matrix);
+         }
+         flagellaMesh.instanceMatrix.needsUpdate = true;
+      }
+
       // --- PHASE 1 LOGIC (Injection) ---
       // We clamp 't' to 1.0 after phase1Duration so the Phase 1 state persists during Phase 2
       let t1 = Math.min(1, elapsed / phase1Duration); 
