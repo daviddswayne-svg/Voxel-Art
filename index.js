@@ -299,6 +299,51 @@ const generateMatrixVoxels = () => {
   return voxels;
 };
 
+// 8. Generate New Phage Parts (Assembly Phase)
+const generateAssemblyVoxels = () => {
+  const voxels = [];
+  // Define 3 "assembly centers" in the *cutaway* zone (x > 5, z > 5) so they are visible!
+  // Bacterium cutaway is x > 5 && z > 5. 
+  const centers = [
+      {x: 20, y: -65, z: 20},
+      {x: 35, y: -60, z: 15},
+      {x: 15, y: -70, z: 35}
+  ];
+
+  centers.forEach((center, idx) => {
+      // Build a mini capsid shape at each center
+      const r = 5; 
+      const elongation = 3;
+      for (let x = -r; x <= r; x++) {
+          for (let y = -r - elongation; y <= r + elongation; y++) {
+              for (let z = -r; z <= r; z++) {
+                   const dy = (y > 0) ? Math.max(0, y - elongation) : Math.min(0, y + elongation);
+                   const distSq = x*x + dy*dy + z*z;
+                   // Simpler octahedron/sphere hybrid for baby phages
+                   if (distSq < r*r && (Math.abs(x)+Math.abs(dy)+Math.abs(z)) < r * 1.5) {
+                       // Randomly thin it out slightly to look like it's building
+                       if (Math.random() > 0.3) {
+                           voxels.push({
+                               finalX: center.x + x,
+                               finalY: center.y + y,
+                               finalZ: center.z + z,
+                               centerX: center.x,
+                               centerY: center.y,
+                               centerZ: center.z,
+                               offsetX: (Math.random() - 0.5) * 40, // Increased scatter
+                               offsetY: (Math.random() - 0.5) * 40,
+                               offsetZ: (Math.random() - 0.5) * 40,
+                               id: idx
+                           });
+                       }
+                   }
+              }
+          }
+      }
+  });
+  return voxels;
+};
+
 // --- INITIALIZATION ---
 function init() {
     const container = document.getElementById('canvas-container');
@@ -389,6 +434,7 @@ function init() {
         bacterium: generateBacteriumVoxels(),
         flagella: generateFlagellaVoxels(),
         matrix: generateMatrixVoxels(),
+        assembly: generateAssemblyVoxels(),
     };
 
     // --- MESH SETUP ---
@@ -410,7 +456,12 @@ function init() {
        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
        
        for (let i = 0; i < data.length; i++) {
-         dummy.position.set(data[i].x, data[i].y, data[i].z);
+         if (data[i].x !== undefined) {
+             dummy.position.set(data[i].x, data[i].y, data[i].z);
+         } else if (data[i].finalX !== undefined) {
+             // For assembly voxels, start invisible/far away
+             dummy.position.set(0, -1000, 0); 
+         }
          dummy.scale.set(1, 1, 1);
          dummy.updateMatrix();
          mesh.setMatrixAt(i, dummy.matrix);
@@ -457,12 +508,25 @@ function init() {
     // Background Matrix - Static in scene
     setupMesh(dynamicData.matrix, matrixMaterial, scene, false);
 
+    // Phase 3 Assembly Mesh (New Phage Parts)
+    const assemblyMesh = setupMesh(dynamicData.assembly, capsidMaterial, bacteriumGroup);
+    // Initialize assembly parts to hidden state explicitly
+    for (let i = 0; i < dynamicData.assembly.length; i++) {
+        dummy.position.set(0, -10000, 0);
+        dummy.scale.set(0,0,0);
+        dummy.updateMatrix();
+        assemblyMesh.setMatrixAt(i, dummy.matrix);
+    }
+    assemblyMesh.instanceMatrix.needsUpdate = true;
+
     // --- ANIMATION LOOP ---
-    // Phase 1 (0-12s): Injection
-    // Phase 2 (12-24s): Takeover
-    const phase1Duration = 12000;
-    const phase2Duration = 10000;
-    const totalDuration = phase1Duration + phase2Duration;
+    // Phase 1 (0-8s): Injection (Speeded up)
+    // Phase 2 (8-16s): Takeover
+    // Phase 3 (16-24s): Assembly
+    const phase1Duration = 8000;
+    const phase2Duration = 8000;
+    const phase3Duration = 8000;
+    const totalDuration = phase1Duration + phase2Duration + phase3Duration;
     const startTime = performance.now();
     const blueColor = new THREE.Color(0x00aaff); // Virus Color
     const tempColor = new THREE.Color();
@@ -633,8 +697,10 @@ function init() {
       }
 
       // --- PHASE 2 LOGIC (The Takeover) ---
+      // Persist state if elapsed > phase1Duration
       if (elapsed > phase1Duration) {
-          const t2 = (elapsed - phase1Duration) / phase2Duration; // 0.0 to 1.0
+          // Clamp t2 to 1.0 when we move to phase 3
+          let t2 = Math.min(1.0, (elapsed - phase1Duration) / phase2Duration);
 
           // 1. HOST DESTRUCTION (Nucleoid Dissolve): 0.0 - 0.3
           if (nucleoidMesh) {
@@ -671,7 +737,6 @@ function init() {
               for (let i = 0; i < iData.length; i++) {
                   const v = iData[i];
                   
-                  // Only affect the pool, not the stream remnants (which are gone/hidden by Phase 1 logic ideally, but we ensure pool logic here)
                   if (v.y < -55) {
                       let tx = 0, ty = 0, tz = 0;
                       // Group 0: Left, Group 1: Right, Group 2: Back/Up
@@ -712,8 +777,62 @@ function init() {
               ribosomeMesh.instanceColor.needsUpdate = true;
           }
       } 
-      // Reset Phase 2 states if looping back to start (handled naturally by re-render, but need to reset colors)
-      else if (elapsed < 100) {
+
+      // --- PHASE 3 LOGIC (Assembly) ---
+      if (elapsed > phase1Duration + phase2Duration) {
+          const t3 = (elapsed - (phase1Duration + phase2Duration)) / phase3Duration; // 0.0 to 1.0
+          
+          if (assemblyMesh) {
+              const aData = dynamicData.assembly;
+              for (let i = 0; i < aData.length; i++) {
+                  const v = aData[i];
+                  // Start appearing based on random noise to look "built"
+                  const noise = Math.sin(v.finalX * 0.1) * Math.cos(v.finalY * 0.1);
+                  const startThreshold = (noise + 1) / 2 * 0.5; // 0.0 to 0.5
+                  
+                  if (t3 > startThreshold) {
+                      // Normalize time for this specific voxel
+                      const localT = Math.min(1, (t3 - startThreshold) / 0.5);
+                      const ease = 1 - Math.pow(1 - localT, 3); // Cubic out
+                      
+                      // Lerp Position: Random scatter -> Final Position
+                      const currX = v.finalX + v.offsetX * (1 - ease);
+                      const currY = v.finalY + v.offsetY * (1 - ease);
+                      const currZ = v.finalZ + v.offsetZ * (1 - ease);
+                      
+                      // Scale up from 0 to 1
+                      const currScale = ease;
+                      
+                      // Rotate while assembling
+                      dummy.rotation.set(localT * Math.PI, localT * Math.PI, 0);
+
+                      dummy.position.set(currX, currY, currZ);
+                      dummy.scale.set(currScale, currScale, currScale);
+                  } else {
+                      dummy.position.set(0, -10000, 0);
+                      dummy.scale.set(0,0,0);
+                  }
+                  dummy.updateMatrix();
+                  assemblyMesh.setMatrixAt(i, dummy.matrix);
+              }
+              assemblyMesh.instanceMatrix.needsUpdate = true;
+          }
+      } else {
+          // Ensure assembly mesh is hidden if we loop back or are in early phases
+          if (assemblyMesh && elapsed < phase1Duration + phase2Duration) {
+              const aData = dynamicData.assembly;
+              for (let i = 0; i < aData.length; i++) {
+                 dummy.position.set(0, -10000, 0);
+                 dummy.scale.set(0,0,0);
+                 dummy.updateMatrix();
+                 assemblyMesh.setMatrixAt(i, dummy.matrix);
+              }
+              assemblyMesh.instanceMatrix.needsUpdate = true;
+          }
+      }
+
+      // Reset Logic if looping back to start (handled naturally by re-render, but need to reset colors)
+      if (elapsed < 100) {
            // Reset Ribosomes
            if (ribosomeMesh) {
                for (let i = 0; i < dynamicData.bacterium.ribosomes.length; i++) {
