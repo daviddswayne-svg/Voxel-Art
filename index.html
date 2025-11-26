@@ -4,8 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>T4 Voxel Phage</title>
-    <!-- Babel Standalone for in-browser TypeScript/JSX transpilation -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
       /* Base & Reset */
       body { margin: 0; overflow: hidden; background-color: #171717; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -13,6 +11,7 @@
       /* Layout Utilities */
       .relative { position: relative; }
       .absolute { position: absolute; }
+      .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
       .w-full { width: 100%; }
       .h-screen { height: 100vh; }
       .overflow-hidden { overflow: hidden; }
@@ -65,21 +64,60 @@
       .space-y-4 > * + * { margin-top: 1rem; }
       .max-w-sm { max-width: 24rem; }
     </style>
-  <script type="importmap">
+    <!-- Standard Import Map for Native Modules -->
+    <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react/": "https://esm.sh/react@19.0.0/",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "three": "https://esm.sh/three@0.170.0",
-    "three/": "https://esm.sh/three@0.170.0/",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/",
+    "three/": "https://aistudiocdn.com/three@^0.181.2/"
   }
 }
 </script>
 </head>
   <body>
-    <div id="root"></div>
-    <script type="text/babel" data-type="module" data-presets="react,typescript" src="./index.tsx"></script>
+    <!-- Main Application Container -->
+    <div class="relative w-full h-screen bg-neutral-900 text-white overflow-hidden font-sans">
+        <!-- 3D Canvas Container -->
+        <div id="canvas-container" class="absolute inset-0 w-full h-full"></div>
+
+        <!-- Overlay UI -->
+        <div class="absolute top-8 left-8 z-10 pointer-events-none mix-blend-difference">
+          <h1 class="text-4xl font-bold tracking-tighter mb-2 text-white">T4 BACTERIOPHAGE</h1>
+          <h2 class="text-lg text-neutral-300 font-mono tracking-widest uppercase mb-6">Viral Injection Simulation</h2>
+          
+          <div class="space-y-4 max-w-sm">
+            <div class="border-l-2 border-cyan-500 pl-4">
+              <h3 class="text-cyan-400 font-bold text-sm uppercase">Phage Capsid</h3>
+              <p class="text-xs text-neutral-400 leading-relaxed">
+                Draining: The viral genome is actively being pumped out of the capsid head.
+              </p>
+            </div>
+            <div class="border-l-2 border-emerald-500 pl-4">
+              <h3 class="text-emerald-500 font-bold text-sm uppercase">Contractile Sheath</h3>
+              <p class="text-xs text-neutral-400 leading-relaxed">
+                Animating: The tail sheath contracts mechanically, driving the core through the cell wall.
+              </p>
+            </div>
+            <div class="border-l-2 border-red-500 pl-4">
+              <h3 class="text-red-500 font-bold text-sm uppercase">Infection</h3>
+              <p class="text-xs text-neutral-400 leading-relaxed">
+                Viral DNA enters the host cytoplasm, forming a chaotic pool of genetic material.
+              </p>
+            </div>
+          </div>
+        </div>
+  
+        <div class="absolute bottom-8 right-8 z-10 text-right pointer-events-none">
+          <div class="text-xs font-mono text-neutral-500">
+            STATUS: INJECTION SEQUENCE<br />
+            VOXEL COUNT: 48,000+<br />
+            FPS: OPTIMIZED INSTANCING
+          </div>
+        </div>
+      </div>
+
+    <!-- Application Logic -->
+    <script type="module" src="./index.js"></script>
   </body>
 </html>
